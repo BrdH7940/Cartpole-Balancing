@@ -2,7 +2,7 @@ import numpy as np
 import gymnasium as gym
 from model import ActorCriticAgent
 
-def train(env, agent, episodes):
+def train(env, agent, episodes, N):
     episode_rewards = []
     
     # Pre-calculate scaling factors for state variables
@@ -21,6 +21,7 @@ def train(env, agent, episodes):
         
         total_reward = 0
         done = False
+        transitions = []
         
         while not done:
             action = agent.choose_action(state)
@@ -28,7 +29,11 @@ def train(env, agent, episodes):
             done = terminated or truncated
             next_state = (next_state - state_low) / state_range  # Scale the next state
             
-            agent.update(state, action, reward, next_state, done)
+            transitions.append((state, action, reward, next_state, done))
+            
+            if len(transitions) == N or done:
+                agent.update(transitions)
+                transitions = []
             
             state = next_state
             total_reward += reward
