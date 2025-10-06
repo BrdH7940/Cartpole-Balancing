@@ -98,4 +98,6 @@ $$
 
 ### 📊 Training Performance
 
-![Training Performance Plot](misc/TileCoding.JPG)
+![Training Performance Plot](../misc/TileCoding.png)
+
+**Observation**: Although the variance is substantially higher, the total reward surpassed the prototype version significantly.
