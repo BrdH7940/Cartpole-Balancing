@@ -1,5 +1,3 @@
-# Cartpole Balancing using Reinforcement Learning
-
 ### 🎯 Problem Definition: CartPole Balancing
 
 **Objective:** Prevent a pole attached to a cart from falling over.
@@ -27,7 +25,7 @@ $$
 \pi(a|s; \theta) = \frac{e^{\phi(s)^T \theta_a}}{\sum_{b} e^{\phi(s)^T \theta_b}}
 $$
 
-Where $$\theta ∈ R^(d×2)$$ are our actor parameters.
+Where $$\theta ∈ R^{\(d×2\)}$$ are our actor parameters.
 
 #### 3. **Critic: State-Value Function**
 
@@ -76,3 +74,15 @@ Here $\mathbf{1}_a$ is a one-hot vector for action $a$.
 ### 📊 Training Performance
 
 ![Training Performance Plot](misc/Reward%20Function%20-%20Prototype.JPG)
+
+The graph shows three distinct phases:
+
+1.  **The Ascent (Episodes 0-750):** The agent starts with no knowledge. The moving average reward slowly and noisily climbs as both the actor and critic begin to form a useful model of the environment.
+2.  **The Peak (Episodes 750-1250):** The agent reaches a point where it can solve the task, achieving the maximum score, but incredibly unstable.
+3.  **The Collapse (Episodes 1250+):** The moving average plummets.
+
+This happens because the agent seems to "forget" everything it learned a series of updates, driven by the inherent instability, pushes the policy or value function parameters into a bad region from which it is difficult to recover. **But why?**
+
+---
+
+
