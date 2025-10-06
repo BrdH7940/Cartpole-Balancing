@@ -1,50 +1,51 @@
 import gymnasium as gym
 import cv2
 import numpy as np
-from model import ActorCritic
+from model import ActorCriticAgent
 from train import train
 from plot import plot_training_progress
 
 def visualize_agent(agent):
-    print("\nVisualizing trained agent's performance for one episode...")
+    print("\nVisualizing trained agent's performance...")
     env = gym.make('CartPole-v1', render_mode='rgb_array')
+    
+    # Scaling factors
+    state_high = env.observation_space.high
+    state_low = env.observation_space.low
+    state_high[state_high == np.inf] = 1.0
+    state_low[state_low == -np.inf] = -1.0
+    state_range = state_high - state_low
+
     state, _ = env.reset()
+    state = (state - state_low) / state_range
+    
     total_reward = 0
     done = False
     
     while not done:
-        # Render the environment frame
         frame = env.render()
         
         # Get action probabilities
-        features = agent.get_features(state)
-        probs = agent.policy(features)
-        action = np.random.choice(agent.n_actions, p=probs) # We still sample to see the actual run
+        probs = agent.get_policy_probabilities(state)
+        action = np.random.choice(len(probs), p=probs)
 
-        # Prepare text to display
+        # Display probabilities
         prob_text_left = f"Left: {probs[0]:.3f}"
         prob_text_right = f"Right: {probs[1]:.3f}"
-
-        # Use OpenCV to add text to the frame
-        # If left probability is higher, color it red and the other green. Vice-versa.
-        if probs[0] > probs[1]:
-            color_left = (0, 0, 255)  # Red
-            color_right = (0, 255, 0) # Green
-        else:
-            color_left = (0, 255, 0)  # Green
-            color_right = (0, 0, 255) # Red
+        color_left = (0, 255, 0) if probs[0] > probs[1] else (0, 0, 255)
+        color_right = (0, 255, 0) if probs[1] > probs[0] else (0, 0, 255)
 
         cv2.putText(frame, prob_text_left, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color_left, 2)
         cv2.putText(frame, prob_text_right, (400, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color_right, 2)
         
-        # Display the frame
         cv2.imshow('CartPole with Policy', frame)
-        if cv2.waitKey(25) & 0xFF == ord('q'): # Press 'q' to quit
+        if cv2.waitKey(25) & 0xFF == ord('q'):
             break
 
-        # Step the environment
         next_state, reward, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
+        
+        next_state = (next_state - state_low) / state_range
         state = next_state
         total_reward += reward
         
@@ -52,8 +53,37 @@ def visualize_agent(agent):
     env.close()
     cv2.destroyAllWindows()
 
-if __name__ == "__main__":
-    agent = ActorCritic(state_dim=4, n_actions=2, alpha_actor=0.001, alpha_critic=0.002)
-    episode_rewards = train(agent, episodes = 2000)
+def main():
+    # Environment setup
+    env = gym.make('CartPole-v1')
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.n
+
+    # Hyperparameters
+    EPISODES = 2000
+    ALPHA = 0.1   # Actor learning rate
+    BETA = 0.5    # Critic learning rate
+    GAMMA = 0.99  # Discount factor
+
+    # Initialize agent
+    agent = ActorCriticAgent(
+        state_dim=state_dim,
+        action_dim=action_dim,
+        alpha=ALPHA,
+        beta=BETA,
+        gamma=GAMMA
+    )
+
+    # Train the agent
+    episode_rewards = train(env, agent, EPISODES)
+
+    # Plot results
     plot_training_progress(episode_rewards)
+
+    # Visualize the trained agent
     visualize_agent(agent)
+
+    env.close()
+
+if __name__ == '__main__':
+    main()

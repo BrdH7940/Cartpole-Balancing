@@ -1,57 +1,72 @@
 import numpy as np
+from tile_coding import IHT, tiles
 
-class ActorCritic:
-    def __init__(self, state_dim, n_actions, gamma=0.99, alpha_actor=0.001, alpha_critic=0.01):
-        self.d = 1 + state_dim + (state_dim * (state_dim + 1)) // 2  # Feature dimension
-        self.n_actions = n_actions
-        self.gamma = gamma
-        self.alpha_actor = alpha_actor
-        self.alpha_critic = alpha_critic
+class ActorCriticAgent:
+    def __init__(self, state_dim, action_dim, alpha=0.1, beta=0.5, gamma=0.99):
+        # Tile coding setup
+        self.num_tilings = 8
+        self.iht_size = 4096
+        self.iht = IHT(self.iht_size)
         
-        # Parameters
-        self.theta = np.random.randn(self.d, n_actions) * 0.01  # Actor
-        self.w = np.random.randn(self.d) * 0.01  # Critic
-    
-    def get_features(self, state):
-        """Convert state to polynomial features"""
-        features = []
-        for i in range(len(state)):
-            features.append(state[i])
-            for j in range(i, len(state)):
-                features.append(state[i] * state[j])
-        return np.array([1] + features)
-    
-    def policy(self, features):
-        """Get action probabilities"""
-        preferences = features @ self.theta
-        exp_prefs = np.exp(preferences - np.max(preferences))
+        # Actor and Critic parameters
+        self.theta = np.zeros((self.iht_size, action_dim))  # Actor weights
+        self.w = np.zeros(self.iht_size)                   # Critic weights
+        
+        # A common heuristic is to set learning rates relative to the number of tilings
+        self.alpha = alpha / self.num_tilings # Actor learning rate
+        self.beta = beta / self.num_tilings   # Critic learning rate
+        self.gamma = gamma                    # Discount factor
+        self.action_dim = action_dim
+
+    def get_active_tiles(self, state):
+        """ Returns the list of active tile indices for a given state. """
+        # Assuming state is already scaled to [0, 1] for all dimensions
+        scaled_state = [s * 10 for s in state] # Scale to [0, 10] for better tile distribution
+        return tiles(self.iht, self.num_tilings, scaled_state)
+
+    def get_policy_prefs(self, active_tiles):
+        """ Calculates policy preferences (logits) by summing weights of active tiles. """
+        return np.sum(self.theta[active_tiles], axis=0)
+
+    def get_policy_probabilities(self, state):
+        """ Calculates softmax policy probabilities. """
+        active_tiles = self.get_active_tiles(state)
+        prefs = self.get_policy_prefs(active_tiles)
+        exp_prefs = np.exp(prefs - np.max(prefs)) # Softmax for stability
         return exp_prefs / np.sum(exp_prefs)
-    
-    def select_action(self, features):
-        """Sample action from policy"""
-        probs = self.policy(features)
-        return np.random.choice(self.n_actions, p=probs)
-    
-    def value(self, features):
-        """State-value estimate"""
-        return features @ self.w
-    
+
+    def get_value(self, active_tiles):
+        """ Calculates the state value by summing weights of active tiles. """
+        return np.sum(self.w[active_tiles])
+
+    def choose_action(self, state):
+        probs = self.get_policy_probabilities(state)
+        return np.random.choice(self.action_dim, p=probs)
+
     def update(self, state, action, reward, next_state, done):
-        """One-step Actor-Critic update"""
-        phi = self.get_features(state)
-        phi_next = self.get_features(next_state) if not done else np.zeros_like(phi)
+        active_tiles = self.get_active_tiles(state)
         
-        # TD Error
-        V_current = self.value(phi)
-        V_next = self.value(phi_next) if not done else 0
-        td_error = reward + self.gamma * V_next - V_current
+        # Calculate TD Error
+        current_val = self.get_value(active_tiles)
+        if done:
+            next_val = 0
+        else:
+            next_active_tiles = self.get_active_tiles(next_state)
+            next_val = self.get_value(next_active_tiles)
         
-        # Critic update
-        self.w += self.alpha_critic * td_error * phi
+        td_error = reward + self.gamma * next_val - current_val
+        
+        # Critic update: Only update the weights for the active tiles
+        self.w[active_tiles] += self.beta * td_error
         
         # Actor update
-        probs = self.policy(phi)
-        action_grad = np.zeros(self.n_actions)
-        action_grad[action] = 1
-        policy_grad = phi[:, np.newaxis] @ (action_grad - probs)[np.newaxis, :]
-        self.theta += self.alpha_actor * td_error * policy_grad
+        prefs = self.get_policy_prefs(active_tiles)
+        exp_prefs = np.exp(prefs - np.max(prefs))
+        policy = exp_prefs / np.sum(exp_prefs)
+        
+        # Update only the columns of theta corresponding to the active tiles
+        for i in range(self.action_dim):
+            if i == action:
+                self.theta[active_tiles, i] += self.alpha * td_error * (1 - policy[i])
+            else:
+                self.theta[active_tiles, i] += self.alpha * td_error * (-policy[i])
