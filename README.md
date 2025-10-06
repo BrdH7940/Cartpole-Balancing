@@ -1,3 +1,5 @@
+# Cartpole Balancing
+
 ### 🎯 Problem Definition: CartPole Balancing
 
 **Objective:** Prevent a pole attached to a cart from falling over.
@@ -6,6 +8,10 @@
 - **Action (a):** `0` (push left) or `1` (push right)
 - **Reward:** `+1` for every timestep the pole remains upright
 - **Termination:** Pole angle > ±12° or cart moves > ±2.4 units from center
+
+---
+
+# Prototype
 
 ---
 
@@ -44,19 +50,19 @@ Where $$w ∈ R^d$$ are our critic parameters.
 **Update Rules:**
 
 1. **TD Error:**
-   
+
 $$
 \delta_t = r_{t+1} + \gamma V(s_{t+1}; w) - V(s_t; w)
 $$
 
 2. **Critic Update (Semi-gradient TD(0)):**
-   
+
 $$
 w \leftarrow w + \beta \delta_t \nabla_w V(s_t; w) = w + \beta \delta_t \phi(s_t)
 $$
 
 3. **Actor Update (Policy Gradient):**
-   
+
 $$
 \theta \leftarrow \theta + \alpha \delta_t \nabla_\theta \log \pi(a_t|s_t; \theta)
 $$
@@ -73,7 +79,7 @@ Here $\mathbf{1}_a$ is a one-hot vector for action $a$.
 
 ### 📊 Training Performance
 
-![Training Performance Plot](misc/Reward%20Function%20-%20Prototype.JPG)
+![Training Performance Plot](misc/Prototype.JPG)
 
 The graph shows three distinct phases:
 
@@ -81,8 +87,4 @@ The graph shows three distinct phases:
 2.  **The Peak (Episodes 750-1250):** The agent reaches a point where it can solve the task, achieving the maximum score, but incredibly unstable.
 3.  **The Collapse (Episodes 1250+):** The moving average plummets.
 
-This happens because the agent seems to "forget" everything it learned a series of updates, driven by the inherent instability, pushes the policy or value function parameters into a bad region from which it is difficult to recover. **But why?**
-
----
-
-
+This happens because the agent seems to "forget" everything it learned a series of updates, driven by the inherent instability, pushes the policy or value function parameters into a bad region from which it is difficult to recover.
