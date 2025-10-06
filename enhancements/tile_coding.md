@@ -100,4 +100,47 @@ $$
 
 ![Training Performance Plot](../misc/TileCoding.png)
 
-**Observation**: Although the variance is substantially higher, the total reward surpassed the prototype version significantly.
+**Observation**: Although the variance is substantially higher, the total reward surpassed the prototype version significantly, and the stability is significantly increased (No more steady declines after peaking).
+
+### Why it performed better than the standard version (No Tile Coding)?
+
+#### 1. Global, Correlated Generalization (Polynomial Features)
+
+The value of a state is a dot product:
+
+$$
+V(s; w) = \phi(s)^T w = \sum_{i} \phi_i(s) w_i
+$$
+
+The key issue is that the features ($1, x, \theta, x \cdot \theta, ...$) are **global**. If a feature like $x \cdot \theta$ is non-zero, it will influence large regions of the state space. When we perform an update:
+
+$$
+w_i \leftarrow w_i + \beta \delta_t \phi_i(s_t)
+$$
+
+Just like we are changing a weight $w_i$ that affects the value estimate for **many other unrelated states**. If the agent receives a single large, noisy $δ_t$ (a bad critique), this update can **interference** and corrupt the value function across the board.
+
+In short, the dense feature vector, once being updated, affects a large area, instead of small neighbor areas.
+
+#### 2. Local, Controlled Generalization (Tile Coding)
+
+The value of a state is a sum over a small, fixed number of active weights:
+
+$$
+V(s; w) = \sum_{i \in \phi(s)} w_i
+$$
+
+When we perform an update, we only modify the weights of the currently active tiles:
+
+$$
+\text{For each } i \in \phi(s_t): \quad w_i \leftarrow w_i + \beta \delta_t
+$$
+
+This generalization is **local**. An update at state $s$ only affects states that share at least one of its active tiles, it doesn't corrupt the entire value function. This is why the learning process in this version is so much more robust and does not collapse.
+
+| Metric               | Graph 1 (Polynomial Features)                                                                                        | Graph 2 (Tile Coding)                                                                                                                | Winner          |
+| :------------------- | :------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------- | :-------------- |
+| **Learning Speed**   | Very slow. Takes ~750 episodes to show significant progress.                                                         | Rapid. Shows strong, immediate progress from the very first episodes.                                                                | **Tile Coding** |
+| **Peak Performance** | The moving average peaks at a reward of ~210.                                                                        | The moving average consistently exceeds 400, approaching the maximum of 500.                                                         | **Tile Coding** |
+| **Stability**        | **Unstable learning process.** After peaking, the agent's performance catastrophically collapses and never recovers. | **Stable learning process.** The agent learns and maintains a high level of performance without collapsing.                          | **Tile Coding** |
+| **Variance**         | Moderate variance during learning, followed by low variance at a suboptimal level after the collapse.                | **High performance variance.** Even with a high average reward, individual episode rewards fluctuate wildly (e.g., from 150 to 500). | N/A             |

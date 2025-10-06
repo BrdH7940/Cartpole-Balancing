@@ -46,7 +46,7 @@ def plot_training_progress(episode_rewards, window=100, solved_threshold=475):
     plt.grid(True)
     
     # Set y-axis limits for better readability, especially if there are outliers
-    # The max score for CartPole-v1 is 500.
-    plt.ylim(0, 550)
+    # The max score for CartPole-v1 is 500, but can be configured.
+    plt.ylim(0, 2100)
     
     plt.show()

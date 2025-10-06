@@ -7,7 +7,7 @@ from plot import plot_training_progress
 
 def visualize_agent(agent):
     print("\nVisualizing trained agent's performance...")
-    env = gym.make('CartPole-v1', render_mode='rgb_array')
+    env = gym.make('CartPole-v1', render_mode='rgb_array', max_episode_steps=2000)
     
     # Scaling factors
     state_high = env.observation_space.high
@@ -55,15 +55,15 @@ def visualize_agent(agent):
 
 def main():
     # Environment setup
-    env = gym.make('CartPole-v1')
+    env = gym.make('CartPole-v1', max_episode_steps = 2000)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
 
     # Hyperparameters
     EPISODES = 2000
-    ALPHA = 0.1   # Actor learning rate
-    BETA = 0.5    # Critic learning rate
-    GAMMA = 0.99  # Discount factor
+    ALPHA = 0.03   # Actor learning rate
+    BETA = 0.07    # Critic learning rate
+    GAMMA = 1.0  # Discount factor
 
     # Initialize agent
     agent = ActorCriticAgent(
