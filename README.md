@@ -11,7 +11,7 @@
 
 ---
 
-### 🧮 Mathematical Setup
+### 🧮 Mathematical Setup (Prototype)
 
 We'll use **linear function approximation** for both actor and critic.
 
@@ -73,3 +73,9 @@ $$
 $$
 
 Here $\mathbf{1}_a$ is a one-hot vector for action $a$.
+
+---
+
+### 📊 Training Performance
+
+![Training Performance Plot](misc/Reward%20Function%20-%20Prototype.JPG)

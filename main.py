@@ -54,6 +54,6 @@ def visualize_agent(agent):
 
 if __name__ == "__main__":
     agent = ActorCritic(state_dim=4, n_actions=2, alpha_actor=0.001, alpha_critic=0.002)
-    episode_rewards = train(agent, episodes = 1200)
+    episode_rewards = train(agent, episodes = 2000)
     plot_training_progress(episode_rewards)
     visualize_agent(agent)
