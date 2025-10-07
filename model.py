@@ -23,7 +23,7 @@ class ActorCriticNetwork(nn.Module):
         return action_logits, value
 
 class ActorCriticAgent:
-    def __init__(self, state_dim, action_dim, lr=1e-3, gamma=1.0, c_v=0.5, c_s=0.01):
+    def __init__(self, state_dim, action_dim, lr=5e-4, gamma=1.0, c_v=0.5, c_s=0.01):
         self.gamma = gamma
         self.c_v = c_v
         self.c_s = c_s

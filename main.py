@@ -49,8 +49,8 @@ if __name__ == '__main__':
     env = gym.make('CartPole-v1', max_episode_steps = 2000)
     
     # Hyperparameters
-    EPISODES = 2000
-    N_STEPS = 16 # Collect 128 steps of experience before updating
+    EPISODES = 5000
+    N_STEPS = 32 # Collect 128 steps of experience before updating
     
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
