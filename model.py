@@ -43,30 +43,45 @@ class ActorCriticAgent:
         probs = self.get_policy_probabilities(state)
         return np.random.choice(self.action_dim, p=probs)
 
-    def update(self, state, action, reward, next_state, done):
-        active_tiles = self.get_active_tiles(state)
+    def update(self, transitions):
+        # Unpack transitions
+        states, actions, rewards, next_states, dones = zip(*transitions)
         
-        # Calculate TD Error
-        current_val = self.get_value(active_tiles)
-        if done:
-            next_val = 0
-        else:
-            next_active_tiles = self.get_active_tiles(next_state)
-            next_val = self.get_value(next_active_tiles)
+        # 1. Calculate N-step returns (iterating backwards)
+        returns = []
+        G = 0
         
-        td_error = reward + self.gamma * next_val - current_val
+        # Bootstrap from the value of the state just beyond the buffer
+        if not dones[-1]:
+            last_state_tiles = self.get_active_tiles(next_states[-1])
+            G = self.get_value(last_state_tiles)
         
-        # Critic update: Only update the weights for the active tiles
-        self.w[active_tiles] += self.beta * td_error
+        # Iterate from the last transition to the first
+        for reward in reversed(rewards):
+            G = reward + self.gamma * G
+            returns.insert(0, G)
         
-        # Actor update
-        prefs = self.get_policy_prefs(active_tiles)
-        exp_prefs = np.exp(prefs - np.max(prefs))
-        policy = exp_prefs / np.sum(exp_prefs)
-        
-        # Update only the columns of theta corresponding to the active tiles
-        for i in range(self.action_dim):
-            if i == action:
-                self.theta[active_tiles, i] += self.alpha * td_error * (1 - policy[i])
-            else:
-                self.theta[active_tiles, i] += self.alpha * td_error * (-policy[i])
+        # 2. Perform updates for each step (iterating forwards)
+        for i, G in enumerate(returns):
+            state = states[i]
+            action = actions[i]
+            
+            active_tiles = self.get_active_tiles(state)
+            
+            # Calculate advantage
+            current_val = self.get_value(active_tiles)
+            advantage = G - current_val
+            
+            # Critic update
+            self.w[active_tiles] += self.beta * advantage
+            
+            # Actor update
+            prefs = self.get_policy_prefs(active_tiles)
+            exp_prefs = np.exp(prefs - np.max(prefs))
+            policy = exp_prefs / np.sum(exp_prefs)
+            
+            for j in range(self.action_dim):
+                if j == action:
+                    self.theta[active_tiles, j] += self.alpha * advantage * (1 - policy[j])
+                else:
+                    self.theta[active_tiles, j] += self.alpha * advantage * (-policy[j])

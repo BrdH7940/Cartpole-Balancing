@@ -60,10 +60,11 @@ def main():
     action_dim = env.action_space.n
 
     # Hyperparameters
-    EPISODES = 2000
+    EPISODES = 1000
     ALPHA = 0.03   # Actor learning rate
     BETA = 0.07    # Critic learning rate
     GAMMA = 1.0  # Discount factor
+    N = 10 # N-step updates
 
     # Initialize agent
     agent = ActorCriticAgent(
@@ -75,7 +76,7 @@ def main():
     )
 
     # Train the agent
-    episode_rewards = train(env, agent, EPISODES)
+    episode_rewards = train(env, agent, EPISODES, N)
 
     # Plot results
     plot_training_progress(episode_rewards)
