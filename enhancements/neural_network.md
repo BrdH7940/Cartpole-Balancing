@@ -10,24 +10,28 @@ Let the entire neural network be parameterized by a single set of weights, $\psi
 
 1.  **Input:** The raw state vector $s \in \mathbb{R}^4$.
 2.  **Shared Body:** A set of hidden layers (e.g., one or more fully connected layers with ReLU activation) parameterized by $\psi_{shared}$. This body learns to transform the raw state $s$ into a high-level feature vector $h(s)$.
-    $$
-    h(s) = \text{Body}(s; \psi_{shared})
-    $$
+
+$$
+h(s) = \text{Body}(s; \psi_{shared})
+$$
+
 3.  **Two Heads:**
 
-    - **Critic Head (Value Head):** A single linear output layer (Weighted sum) that takes the feature vector $h(s)$ and produces a scalar state-value estimate.
-      $$
-      V(s; \psi) = \text{CriticHead}(h(s); \psi_{critic})
-      $$
-    - **Actor Head (Policy Head):** A linear output layer (Weighted sum) that takes $h(s)$ and produces a logit for each action.
+- **Critic Head (Value Head):** A single linear output layer (Weighted sum) that takes the feature vector $h(s)$ and produces a scalar state-value estimate.
+    
+$$
+V(s; \psi) = \text{CriticHead}(h(s); \psi_{critic})
+$$
 
-      $$
-      \vec{l}(s; \psi) = \text{ActorHead}(h(s); \psi_{actor})
-      $$
+- **Actor Head (Policy Head):** A linear output layer (Weighted sum) that takes $h(s)$ and produces a logit for each action.
+    
+$$
+\vec{l}(s; \psi) = \text{ActorHead}(h(s); \psi_{actor})
+$$
 
-      $$
-      \pi(\cdot|s; \psi) = \text{Softmax}(\vec{l}(s; \psi))
-      $$
+$$
+\pi(\cdot|s; \psi) = \text{Softmax}(\vec{l}(s; \psi))
+$$
 
 The total set of network parameters is $\psi = \{\psi_{shared}, \psi_{critic}, \psi_{actor}\}$.
 
@@ -73,17 +77,17 @@ The coefficient $c_S$ controls the strength of the exploration incentive.
 
 - **Tile Coding Agent:** The agent's only task was to learn a simple linear mapping on top of these excellent features.
 
-  $$
-  V(s) \approx \sum_{i \in \phi(s)} w_i
-  $$
+$$
+V(s) \approx \sum_{i \in \phi(s)} w_i
+$$
 
   The learning signal from an update only had to adjust a few weights $w_i$, a relatively simple credit assignment problem.
 
 - **Neural Network Agent:** This agent must learn the feature extractor _and_ the value/policy functions simultaneously.
 
-  $$
-  V(s) \approx \text{CriticHead}(\underbrace{\text{Body}(s; \psi_{shared})}_{\text{Must be learned}}; \psi_{critic})
-  $$
+$$
+V(s) \approx \text{CriticHead}(\underbrace{\text{Body}(s; \psi_{shared})}_{\text{Must be learned}}; \psi_{critic})
+$$
 
   This means a single update based on an advantage $A_t$ creates a dense, complex gradient that can subtly alter the _entire feature representation_ for all states.
 
