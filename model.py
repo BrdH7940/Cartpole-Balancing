@@ -1,87 +1,87 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.distributions import Categorical
 import numpy as np
-from tile_coding import IHT, tiles
+
+class ActorCriticNetwork(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_dim=128):
+        super(ActorCriticNetwork, self).__init__()
+        self.shared_layers = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU()
+        )
+        self.actor_head = nn.Linear(hidden_dim, action_dim)
+        self.critic_head = nn.Linear(hidden_dim, 1)
+
+    def forward(self, state):
+        features = self.shared_layers(state)
+        action_logits = self.actor_head(features)
+        value = self.critic_head(features)
+        return action_logits, value
 
 class ActorCriticAgent:
-    def __init__(self, state_dim, action_dim, alpha=0.1, beta=0.5, gamma=0.99):
-        # Tile coding setup
-        self.num_tilings = 8
-        self.iht_size = 4096
-        self.iht = IHT(self.iht_size)
+    def __init__(self, state_dim, action_dim, lr=1e-3, gamma=1.0, c_v=0.5, c_s=0.01):
+        self.gamma = gamma
+        self.c_v = c_v
+        self.c_s = c_s
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        # Actor and Critic parameters
-        self.theta = np.zeros((self.iht_size, action_dim))  # Actor weights
-        self.w = np.zeros(self.iht_size)                   # Critic weights
-        
-        # A common heuristic is to set learning rates relative to the number of tilings
-        self.alpha = alpha / self.num_tilings # Actor learning rate
-        self.beta = beta / self.num_tilings   # Critic learning rate
-        self.gamma = gamma                    # Discount factor
-        self.action_dim = action_dim
-
-    def get_active_tiles(self, state):
-        """ Returns the list of active tile indices for a given state. """
-        # Assuming state is already scaled to [0, 1] for all dimensions
-        scaled_state = [s * 10 for s in state] # Scale to [0, 10] for better tile distribution
-        return tiles(self.iht, self.num_tilings, scaled_state)
-
-    def get_policy_prefs(self, active_tiles):
-        """ Calculates policy preferences (logits) by summing weights of active tiles. """
-        return np.sum(self.theta[active_tiles], axis=0)
-
-    def get_policy_probabilities(self, state):
-        """ Calculates softmax policy probabilities. """
-        active_tiles = self.get_active_tiles(state)
-        prefs = self.get_policy_prefs(active_tiles)
-        exp_prefs = np.exp(prefs - np.max(prefs)) # Softmax for stability
-        return exp_prefs / np.sum(exp_prefs)
-
-    def get_value(self, active_tiles):
-        """ Calculates the state value by summing weights of active tiles. """
-        return np.sum(self.w[active_tiles])
+        self.network = ActorCriticNetwork(state_dim, action_dim).to(self.device)
+        self.optimizer = optim.Adam(self.network.parameters(), lr=lr)
 
     def choose_action(self, state):
-        probs = self.get_policy_probabilities(state)
-        return np.random.choice(self.action_dim, p=probs)
+        state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+        action_logits, _ = self.network(state)
+        dist = Categorical(logits=action_logits)
+        action = dist.sample()
+        return action.item()
 
     def update(self, transitions):
-        # Unpack transitions
         states, actions, rewards, next_states, dones = zip(*transitions)
-        
-        # 1. Calculate N-step returns (iterating backwards)
+
+        states = torch.FloatTensor(np.array(states)).to(self.device)
+        actions = torch.LongTensor(actions).to(self.device)
+        rewards = torch.FloatTensor(rewards).to(self.device)
+        next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
+        dones = torch.FloatTensor(dones).to(self.device)
+
+        # Get values and action distributions for the buffered states
+        action_logits, values = self.network(states)
+        values = values.squeeze()
+        dist = Categorical(logits=action_logits)
+
+        # Get value of the last next_state for bootstrapping
+        _, next_value = self.network(next_states[-1].unsqueeze(0))
+        next_value = next_value.squeeze().detach()
+
+        # Calculate N-step returns
         returns = []
-        G = 0
-        
-        # Bootstrap from the value of the state just beyond the buffer
-        if not dones[-1]:
-            last_state_tiles = self.get_active_tiles(next_states[-1])
-            G = self.get_value(last_state_tiles)
-        
-        # Iterate from the last transition to the first
+        G = next_value * (1 - dones[-1])
         for reward in reversed(rewards):
             G = reward + self.gamma * G
             returns.insert(0, G)
+        returns = torch.stack(returns)
+
+        # Calculate losses
+        advantage = (returns - values).detach()
         
-        # 2. Perform updates for each step (iterating forwards)
-        for i, G in enumerate(returns):
-            state = states[i]
-            action = actions[i]
-            
-            active_tiles = self.get_active_tiles(state)
-            
-            # Calculate advantage
-            current_val = self.get_value(active_tiles)
-            advantage = G - current_val
-            
-            # Critic update
-            self.w[active_tiles] += self.beta * advantage
-            
-            # Actor update
-            prefs = self.get_policy_prefs(active_tiles)
-            exp_prefs = np.exp(prefs - np.max(prefs))
-            policy = exp_prefs / np.sum(exp_prefs)
-            
-            for j in range(self.action_dim):
-                if j == action:
-                    self.theta[active_tiles, j] += self.alpha * advantage * (1 - policy[j])
-                else:
-                    self.theta[active_tiles, j] += self.alpha * advantage * (-policy[j])
+        # Actor loss
+        log_probs = dist.log_prob(actions)
+        actor_loss = -(advantage * log_probs).mean()
+        
+        # Critic loss
+        critic_loss = nn.MSELoss()(values, returns)
+        
+        # Entropy bonus
+        entropy_loss = dist.entropy().mean()
+        
+        # Combined loss
+        loss = actor_loss + self.c_v * critic_loss - self.c_s * entropy_loss
+        
+        # Update
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
